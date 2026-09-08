@@ -92,7 +92,6 @@ The AI workflow is grounded in the retrieval-augmented generation approach from 
 - [ ] AI/RAG pipeline
 - [ ] Deployment
 
-📅 See the [12-week roadmap](./docs/17-roadmap.md) for the full build plan.
 
 ---
 
