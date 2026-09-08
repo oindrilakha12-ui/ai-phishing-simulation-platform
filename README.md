@@ -21,7 +21,7 @@ Security teams often run phishing-awareness campaigns manually — writing email
 
 This platform automates that workflow with AI: it generates realistic, policy-grounded phishing simulations, tracks how employees respond, and turns the results into explainable risk scores and personalized coaching — all with a human reviewer in the loop at every step.
 
-> ⚠️ **This is a contained student/training prototype.** It cannot send content to real, non-consenting recipients, and takes no automated punitive action against employees. Every AI-generated artifact and every risk assessment requires human review before it has any real-world effect.
+
 
 ---
 
