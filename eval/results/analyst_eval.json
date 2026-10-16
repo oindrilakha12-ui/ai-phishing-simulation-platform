@@ -1,0 +1,47 @@
+{
+  "generated_at": "2026-10-15T09:12:40.472086+00:00",
+  "mode": "DEMO (no LLM key; deterministic)",
+  "dataset": {
+    "path": "C:\\Users\\oindr\\Desktop\\OJT phising\\eval\\data\\emails.jsonl",
+    "n": 120,
+    "phishing": 64,
+    "legitimate": 56,
+    "synthetic": true
+  },
+  "threshold": 20,
+  "heuristic_only": {
+    "n": 120,
+    "accuracy": 0.9417,
+    "precision": 0.9014,
+    "recall": 1.0,
+    "f1": 0.9481,
+    "confusion_matrix": {
+      "tp": 64,
+      "fp": 7,
+      "fn": 0,
+      "tn": 49
+    },
+    "latency_ms": {
+      "p50": 0.313,
+      "p95": 0.704
+    },
+    "tokens_per_call": 0
+  },
+  "llm_only": {
+    "skipped": true,
+    "reason": "DEMO MODE: no AI provider key set. LLM-only metrics require a live model."
+  },
+  "combined": {
+    "skipped": true,
+    "reason": "Requires LLM-only scores (live mode)."
+  },
+  "heuristic_misclassified_ids": [
+    "l6",
+    "l5",
+    "l34",
+    "l4",
+    "l38",
+    "l29",
+    "l1"
+  ]
+}

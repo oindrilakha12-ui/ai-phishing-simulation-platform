@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend lint + test
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/requirements*.txt }
+      - run: pip install -r requirements-dev.txt
+      - name: Lint (ruff)
+        run: ruff check app tests
+      - name: Type check (mypy, lenient)
+        run: mypy app
+      - name: Tests + coverage
+        run: pytest -o addopts="" --cov=app --cov-report=xml --cov-report=term
+      - uses: actions/upload-artifact@v4
+        with: { name: backend-coverage, path: backend/coverage.xml }
+
+  frontend:
+    name: Frontend lint + test + build
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  e2e:
+    name: End-to-end smoke (Playwright)
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: Start backend (SQLite, demo mode)
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+          alembic upgrade head && python -m app.seed
+          nohup uvicorn app.main:app --port 8001 > uvicorn.log 2>&1 &
+      - name: Build + start frontend
+        working-directory: frontend
+        run: |
+          npm ci && npm run build
+          nohup npx next start -p 3000 > next.log 2>&1 &
+          npx playwright install --with-deps chromium
+          npx wait-on -t 60000 http://localhost:3000/login http://localhost:8001/health/ready
+      - name: Playwright
+        working-directory: frontend
+        env: { PW_CHANNEL: chromium }
+        run: npx playwright test
+
+  security:
+    name: Security scans
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Secret scanning (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      # chromadb advisories below affect the Chroma HTTP *server* (REST API, RBAC provider,
+      # trust_remote_code embeddings). PhishGuard embeds Chroma in-process with precomputed
+      # embeddings and exposes no Chroma server; no fixed version exists. Accepted risk is
+      # documented in docs/THREAT_MODEL.md — re-check on every chromadb upgrade.
+      - name: Python dependency audit (pip-audit)
+        run: >
+          pip install pip-audit && pip-audit -r backend/requirements.txt
+          --ignore-vuln PYSEC-2026-311 --ignore-vuln PYSEC-2026-3813
+          --ignore-vuln PYSEC-2026-3814 --ignore-vuln PYSEC-2026-3815
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: npm audit (production deps)
+        working-directory: frontend
+        run: npm ci && npm audit --omit=dev --audit-level=high
+      - name: SBOM (CycloneDX via Syft)
+        uses: anchore/sbom-action@v0
+        with: { path: ., format: cyclonedx-json, output-file: sbom.cdx.json }
+
+  docker:
+    name: Docker build
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t phishguard-backend ./backend
+      - run: docker build -t phishguard-frontend ./frontend

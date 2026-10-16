@@ -1,0 +1,24 @@
+{
+  "generated_at": "2026-10-15T09:12:43.096620+00:00",
+  "mode": "DEMO (no LLM key; deterministic)",
+  "retrieval": {
+    "n_questions": 22,
+    "hit@1": 0.955,
+    "hit@3": 0.955,
+    "mrr": 0.955,
+    "answer_contains_key_fact": 0.864,
+    "out_of_scope_correctly_refused": "4/5",
+    "retrieval_latency_ms": {
+      "p50": 1.204,
+      "p95": 1.688
+    },
+    "vector_store": "chroma",
+    "embedding": "local hashing (lexical)",
+    "similarity_threshold": 0.18
+  },
+  "ragas": {
+    "skipped": true,
+    "reason": "RAGAS requires the `ragas` package and a live LLM key (it uses an LLM as judge). ragas installed: False; demo mode: True."
+  },
+  "benchmark_note": "WikiQA (Yang et al., 2015) is an analogous answer-selection benchmark; not run because our knowledge base is a small domain-specific corpus."
+}

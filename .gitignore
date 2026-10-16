@@ -1,0 +1,38 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# data
+*.db
+*.db-shm
+*.db-wal
+.chroma/
+eval/.chroma-eval/
+
+# node / next
+node_modules/
+.next/
+out/
+frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+*.tsbuildinfo
+next-env.d.ts
+
+# scratch / OS
+scratch_*
+sbom*.json
+.DS_Store
+Thumbs.db

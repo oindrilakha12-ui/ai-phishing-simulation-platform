@@ -1,0 +1,21 @@
+# Runtime dependencies (pinned; verified on Python 3.14.3 / Windows 11).
+# NOTE: there is deliberately NO mail/SMTP library here (enforced by tests/test_safety_scope.py).
+fastapi==0.143.1
+uvicorn[standard]==0.54.0
+pydantic==2.14.1
+pydantic-settings==2.16.0
+email-validator==2.3.0
+SQLAlchemy==2.1.4
+alembic==1.20.0
+psycopg[binary]==3.3.6
+bcrypt==5.0.0
+PyJWT==2.15.1
+PyOTP==2.10.0
+reportlab==5.0.1
+prometheus_client==0.26.0
+httpx==0.28.1
+Faker==40.43.0
+python-multipart==0.0.32
+langgraph==1.2.15
+langgraph-checkpoint==4.3.0
+chromadb==1.5.9
