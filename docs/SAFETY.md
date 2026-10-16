@@ -51,4 +51,6 @@ fictional demo examples against the validator.
   the impact, but a production deployment should add a moderation classifier on input and output.
 - The validator's real-brand list is intentionally small (as specified). It is backed by the
   fictional-brand **allow-list**, which is the stronger check.
-- Live-mode behaviour was **not tested**, because no API key was available.
+- Live mode was tested with Google Gemini (`gemini-3.5-flash-lite`): the required refusal case and a
+  credential-theft request were both refused, and the validator rejected unsafe generator output. This is a
+  handful of checks, not adversarial red-teaming; OpenAI and Anthropic were not run.

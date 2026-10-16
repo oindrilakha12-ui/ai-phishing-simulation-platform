@@ -38,7 +38,9 @@ QA = [
     ("What is quishing?", "qr-code-phishing", "QR"),
     ("Why are QR codes in emails risky?", "qr-code-phishing", "destination"),
     ("How do I read a link's real domain?", "spotting-phishing", "right to left"),
-    ("What do SPF DKIM DMARC failures mean?", "spotting-phishing", "SPF"),
+    ("What do SPF DKIM DMARC failures mean?", "email-authentication", "SPF"),
+    ("What is DKIM?", "email-authentication", "signature"),
+    ("Does passing SPF and DMARC mean an email is safe?", "email-authentication", "look-alike"),
     ("Which attachments are risky?", "spotting-phishing", ".iso"),
 ]
 OUT_OF_SCOPE = [

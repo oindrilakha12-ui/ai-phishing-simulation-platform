@@ -25,6 +25,17 @@ LLM_CLASSIFY_PROMPT = (
 )
 
 
+def _complete_with_retry(provider, user: str, attempts: int = 4):
+    """Retry transient provider errors (rate limit / overloaded) with backoff; None if all attempts fail."""
+    for i in range(attempts):
+        try:
+            return provider.complete(LLM_CLASSIFY_PROMPT, user, max_tokens=30)
+        except Exception as exc:  # noqa: BLE001
+            print(f"  provider error (attempt {i + 1}/{attempts}): {exc!r}"[:200])
+            time.sleep(5 * (i + 1))
+    return None
+
+
 def load():
     if not OUT.exists():
         rows = build()
@@ -54,17 +65,27 @@ def main():
         combined = {"skipped": True, "reason": "Requires LLM-only scores (live mode)."}
     else:
         l_prob, l_lat, toks = [], [], []
+        unparsed = failed_calls = 0
+        model = ""
         for r in rows:
-            res = provider.complete(LLM_CLASSIFY_PROMPT, f"<email>\n{r['raw'][:6000]}\n</email>", max_tokens=30)
+            res = _complete_with_retry(provider, f"<email>\n{r['raw'][:6000]}\n</email>")
+            if res is None:  # provider kept failing: count as unknown rather than abort the whole run
+                failed_calls += 1
+                l_prob.append(0.5)
+                continue
+            model = res.model
             l_lat.append(res.latency_ms)
             toks.append(res.input_tokens + res.output_tokens)
             try:
                 l_prob.append(float(parse_json(res.text)["phishing_probability"]))
             except Exception:  # noqa: BLE001 - unparseable output counts as 0.5 (unknown)
+                unparsed += 1
                 l_prob.append(0.5)
         llm = {**binary_metrics(y, [1 if p >= 0.5 else 0 for p in l_prob]),
                "latency_ms": {"p50": percentile(l_lat, 0.5), "p95": percentile(l_lat, 0.95)},
-               "tokens_per_call": round(sum(toks) / len(toks), 1)}
+               "tokens_per_call": round(sum(toks) / max(len(toks), 1), 1),
+               "model": model, "unparsed_replies": unparsed,
+               "failed_calls": failed_calls}
         comb_scores = [0.6 * h + 0.4 * p * 100 for h, p in zip(h_scores, l_prob)]
         combined = {**binary_metrics(y, [1 if s >= 30 else 0 for s in comb_scores]),
                     "formula": "0.6*heuristic + 0.4*llm_prob*100 >= 30"}

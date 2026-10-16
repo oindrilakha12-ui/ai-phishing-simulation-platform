@@ -132,10 +132,11 @@ update knowledge without retraining.
 - **Accuracy** = (TP+TN)/N. **Precision** = TP/(TP+FP): of what we flagged, how much was really phishing.
   **Recall** = TP/(TP+FN): of all phishing, how much we caught. **F1** = harmonic mean of precision and recall.
 - For a security tool, **recall matters most** (missing phishing is worse than an extra warning).
-  Our heuristics: recall 1.0, precision 0.90, F1 0.948 on 120 synthetic emails.
+  Our heuristics: recall 1.0, precision 0.90, F1 0.948 on 120 synthetic emails. The live LLM (Gemini)
+  scored F1 1.0 on the same set, which mainly shows the synthetic set is easy.
 - **Latency p50/p95:** the median and 95th-percentile response time. p95 shows the "slow tail".
 - **RAG:** hit@k (correct document in the top k), MRR (mean reciprocal rank), and the out-of-scope refusal rate.
-  **RAGAS** adds LLM-judged faithfulness, relevancy and context precision/recall (skipped without a key).
+  **RAGAS** adds LLM-judged faithfulness, relevancy and context precision/recall (not run: `ragas` is not installed).
 - **Honesty point:** the same person wrote the dataset and the rules, so the scores are optimistic.
 
 ## 11. Security and ethics
@@ -238,8 +239,9 @@ update knowledge without retraining.
     `default-src 'none'`, so nothing inside them can load or run.
 
 19. **Q: What are the limitations of your evaluation?**
-    A: The dataset is synthetic and written by the same author as the rules, LLM-only and RAGAS were
-    skipped with no key, and the lexical embedder let one off-topic question through. I report these
+    A: The dataset is synthetic and written by the same author as the rules, so the perfect live-LLM
+    score (Gemini, F1 1.0) is optimistic. RAGAS was not run, only Gemini was tested live, and the lexical
+    embedder still lets one off-topic question past retrieval (the LLM then declines it). I report these
     openly rather than tuning to the test set.
 
 20. **Q: How does auto-enrolment work?**

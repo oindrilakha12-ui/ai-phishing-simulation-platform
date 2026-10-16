@@ -14,7 +14,7 @@ defensive email analyzer, risk scoring, analytics and compliance reports.
 | Backend | FastAPI · Pydantic v2 · SQLAlchemy 2 · Alembic · LangGraph · ChromaDB |
 | Frontend | Next.js 16 (App Router) · React 19 · TypeScript · Tailwind 4 · TanStack Query · Recharts |
 | Database | **SQLite by default on this machine** (zero setup). PostgreSQL via `DATABASE_URL` / docker-compose |
-| AI | Provider interface (OpenAI / Anthropic). **DEMO MODE** with labelled, deterministic output when no key is set |
+| AI | Provider interface (OpenAI / Anthropic / any OpenAI-compatible API, e.g. **Google Gemini**, which was verified live). **DEMO MODE** with labelled, deterministic output when no key is set |
 
 ---
 
@@ -96,16 +96,31 @@ The models, migration and queries are dialect-neutral. Analytics uses `strftime`
 
 ## Adding a real AI provider
 
-In `backend\.env`:
+Set one provider in `backend\.env` (never commit this file). Pick one of these options:
+
+**Google Gemini (free tier; this is the configuration that was tested live).** Gemini exposes an
+OpenAI-compatible API, so it uses the `openai` provider with a different base URL. Get a key at
+https://aistudio.google.com/apikey.
 
 ```
-AI_PROVIDER=anthropic          # or openai
-ANTHROPIC_API_KEY=sk-ant-...   # or OPENAI_API_KEY=...
+AI_PROVIDER=openai
+OPENAI_API_KEY=<your Gemini key>
+OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+OPENAI_MODEL=gemini-3.5-flash-lite
 ```
 
-Restart the backend. The DEMO MODE badge disappears, and every LLM call is prefixed with the
-guardrail system prompt (see `backend/app/ai/prompts.py`). **The live provider paths have not
-been tested in this build, because no key was available.** See *Known limitations*.
+**OpenAI:** `AI_PROVIDER=openai`, `OPENAI_API_KEY=sk-...`, `OPENAI_BASE_URL=https://api.openai.com/v1`.
+**Anthropic:** `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY=sk-ant-...`.
+
+Restart the backend, because `.env` is read only at startup. `http://127.0.0.1:8001/health/ready` then
+reports `demo_mode: false`, the DEMO MODE badge disappears, and every LLM call is prefixed with the
+guardrail system prompt (see `backend/app/ai/prompts.py`). If a live call fails (bad key, rate limit,
+overloaded model), the agent retries once and then falls back to the deterministic answer, so check the
+backend log if answers still look like demo output.
+
+> Gemini model names change often. If you get "model not found / no longer available", list the models
+> your key can use with `GET https://generativelanguage.googleapis.com/v1beta/openai/models` and pick a
+> current `flash` or `flash-lite` model. Larger models sometimes return 503 "high demand" on the free tier.
 
 ---
 
@@ -143,35 +158,40 @@ been tested in this build, because no key was available.** See *Known limitation
 | Learning | Badges, streaks, leaderboard (department default, individual opt-in) | FULLY WORKING (tested) |
 | Risk | Explainable per-person and per-department scores, weekly history | FULLY WORKING (tested) |
 | Report-phish | Learner submit → background heuristic triage → manager queue → in-app feedback | FULLY WORKING (tested) |
-| AI | LangGraph router, 4 agents, retry-once/error node, validator node, session memory, SSE | FULLY WORKING in **DEMO MODE** (tested) |
+| AI | LangGraph router, 4 agents, retry-once/error node, validator node, session memory, SSE | FULLY WORKING (tested in DEMO MODE; verified live with Gemini) |
 | AI | Indicator Analyst rule-based checks (SPF/DKIM/DMARC, Reply-To, link mismatch, lookalike/homoglyph, urgency…) | FULLY WORKING (tested; eval F1 0.948) |
-| AI | Live LLM explanations / tips / RAG answers / example generation | NOT VERIFIED (code paths exist; no key available) |
-| AI | RAG over ChromaDB with sources and "not in knowledge base" | FULLY WORKING (retrieval-only in demo) |
+| AI | Live LLM explanations / tips / RAG answers / example generation | VERIFIED LIVE with Google Gemini (`gemini-3.5-flash-lite`) via the OpenAI-compatible API; OpenAI and Anthropic endpoints not run |
+| AI | RAG over ChromaDB with sources and "not in knowledge base" | FULLY WORKING (retrieval-only in demo; LLM answers in live mode) |
 | Admin | Users, invites, API keys (hashed, scoped), webhooks (HMAC, retry/backoff, delivery log), audit viewer/export, settings, notifications | FULLY WORKING (tested) |
 | Platform | JSON logs + request IDs, Prometheus `/metrics`, security headers/CSP, rate limits, gzip, caching with invalidation | FULLY WORKING |
 | Platform | Redis cache/queue | NOT DONE (feature flag + compose profile only; in-process cache is used) |
 | Platform | i18n | SCAFFOLD (dictionary + example partial Hindi locale; UI strings are mostly inline English) |
 | DevOps | Dockerfiles, docker-compose, GitHub Actions | WRITTEN, NOT EXECUTED locally (Docker daemon off; CI not yet run) |
-| Eval | Analyst (heuristic), RAG retrieval, guardrail/validator | RUN (demo mode); LLM-only and RAGAS SKIPPED (no key) |
+| Eval | Analyst (heuristic, LLM-only, combined), RAG, guardrail/validator | RUN LIVE (Gemini); RAGAS SKIPPED (`ragas` not installed) |
 
-## Verified results (this machine, demo mode)
+## Verified results (this machine)
 
 - **Backend:** `pytest` gives 133 passed, 88% line coverage. `ruff` is clean. `mypy` is clean in lenient mode.
 - **Frontend:** `eslint` and `tsc` are clean. `vitest` gives 15 passed. Playwright gives 4/4 passed in Microsoft Edge. `next build` succeeds.
 - **Audits:** `npm audit --omit=dev` finds 0 vulnerabilities. `pip-audit` finds 5 chromadb advisories, which are server-mode only, documented and ignored.
-- **Eval:** see [eval/README.md](eval/README.md).
+- **Eval (live, Gemini `gemini-3.5-flash-lite`):** see [eval/README.md](eval/README.md).
   - **Heuristic analyzer:** accuracy 0.942, precision 0.901, recall 1.000, F1 0.948 (120 synthetic emails).
-  - **RAG retrieval:** hit@1 0.955; 4 of 5 out-of-scope questions declined.
-  - **Validator:** 55/55. The required refusal works.
+  - **LLM-only and combined:** accuracy 1.000, F1 1.000 on the same 120 synthetic emails (p50 3.2 s per call).
+    The synthetic set is easy for an LLM, so treat this as a sanity check, not a real-world accuracy.
+  - **RAG:** hit@1 0.958 over 24 questions; 5 of 5 out-of-scope questions declined.
+  - **Validator:** 55/55. The required refusal works in live mode too.
 
 ## Known limitations
 
-- **No live LLM was tested.** All AI results above are DEMO MODE, and LLM-only/combined/RAGAS evals were skipped.
+- **Only Gemini was tested live.** The OpenAI and Anthropic endpoints share the same code but were not run.
+  RAGAS was not run. The free Gemini tier sometimes returns 429/503; agents retry once, then fall back to
+  the deterministic answer.
 - **The guardrail in live mode is a system prompt only** (by project decision). Prompt-only guardrails can be
   bypassed by determined users. Deterministic checks apply only to generated training examples (validator)
   and templates. See SAFETY.md.
-- **RAG uses a lexical hashing embedder** (offline, no downloads). It is weaker than neural embeddings,
-  and one off-topic eval question scored above the "not in KB" threshold.
+- **RAG uses a lexical hashing embedder** (offline, no downloads). It is weaker than neural embeddings:
+  one off-topic eval question still scores above the "not in KB" threshold (the live LLM then declines it),
+  and "Which attachments are risky?" retrieves the wrong article first.
 - **Rate limiting, cache, LangGraph session memory and the scheduler are in-process,** so they're single-instance only.
 - **Not executed:** PostgreSQL, Docker and CI. They are configured, but only SQLite was run.
 - **Type checking is lenient:** mypy suppresses ~59 Optional-narrowing warnings.

@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-15T09:12:40.472086+00:00",
-  "mode": "DEMO (no LLM key; deterministic)",
+  "generated_at": "2026-10-16T07:13:20.542738+00:00",
+  "mode": "LIVE (openai)",
   "dataset": {
     "path": "C:\\Users\\oindr\\Desktop\\OJT phising\\eval\\data\\emails.jsonl",
     "n": 120,
@@ -22,18 +22,45 @@
       "tn": 49
     },
     "latency_ms": {
-      "p50": 0.313,
-      "p95": 0.704
+      "p50": 0.808,
+      "p95": 2.503
     },
     "tokens_per_call": 0
   },
   "llm_only": {
-    "skipped": true,
-    "reason": "DEMO MODE: no AI provider key set. LLM-only metrics require a live model."
+    "n": 120,
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "confusion_matrix": {
+      "tp": 64,
+      "fp": 0,
+      "fn": 0,
+      "tn": 56
+    },
+    "latency_ms": {
+      "p50": 3247.249,
+      "p95": 5573.411
+    },
+    "tokens_per_call": 198.4,
+    "model": "gemini-3.5-flash-lite",
+    "unparsed_replies": 0,
+    "failed_calls": 0
   },
   "combined": {
-    "skipped": true,
-    "reason": "Requires LLM-only scores (live mode)."
+    "n": 120,
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "confusion_matrix": {
+      "tp": 64,
+      "fp": 0,
+      "fn": 0,
+      "tn": 56
+    },
+    "formula": "0.6*heuristic + 0.4*llm_prob*100 >= 30"
   },
   "heuristic_misclassified_ids": [
     "l6",
