@@ -97,4 +97,49 @@ def test_learner_inbox_click_auto_enrolls_and_shows_landing(learner, manager):
     r = learner.post(f"/api/v1/inbox/{c['id']}/action", json={"action": "clicked_sim"}).json()
     assert "<input" not in r["landing_page"].lower() and "<form" not in r["landing_page"].lower()
     assert r["red_flags"] and r["enrolled_module"]
-    assert any(e["source"] == "auto" for e in learner.get("/api/v1/training/my").json())
+    assert any(e["module_title"] == r["enrolled_module"] for e in learner.get("/api/v1/training/my").json())
+
+
+def test_real_user_gets_delivery_only_and_real_activity_is_tracked(learner, manager, db):
+    tid, _ = _template_and_dept(manager)
+    c = manager.post("/api/v1/campaigns", json={"name": "Real activity test", "template_id": tid,
+                                                "department_ids": [learner.user["department_id"]]}).json()
+    manager.post(f"/api/v1/campaigns/{c['id']}/transition", json={"to": "active"})
+
+    # The simulator never invents an outcome for a real account: only the delivery exists.
+    item = next(i for i in learner.get("/api/v1/inbox").json() if i["campaign_id"] == c["id"])
+    assert item["actions"] == ["delivered_preview"]
+    preview = learner.get(f"/api/v1/inbox/{c['id']}/preview").json()
+    assert preview["my_actions"] == ["delivered_preview"] and preview["red_flags"] == []
+
+    real = {"campaign_id": c["id"], "real_only": "true"}
+    before = manager.get("/api/v1/analytics/overview", params=real).json()
+    real_recipients = before["kpis"]["recipients"]  # every real learner account in the department
+    assert before["synthetic_data"] is False and real_recipients >= 1
+    assert before["kpis"]["reported"] == 0
+
+    r = learner.post(f"/api/v1/inbox/{c['id']}/action", json={"action": "reported"}).json()
+    assert r["recorded"] is True
+    assert learner.post(f"/api/v1/inbox/{c['id']}/action", json={"action": "reported"}).json()["recorded"] is False
+
+    after = manager.get("/api/v1/analytics/overview", params=real).json()["kpis"]
+    assert after["reported"] == 1 and after["report_rate"] == round(1 / real_recipients, 4)
+    # Once acted, the preview reveals the answer key and remembers the action.
+    preview = learner.get(f"/api/v1/inbox/{c['id']}/preview").json()
+    assert "reported" in preview["my_actions"] and preview["red_flags"]
+
+    feed = manager.get("/api/v1/analytics/live-activity").json()["items"]
+    assert feed[0]["kind"] == "reported" and feed[0]["detail"] == "Real activity test"
+    assert learner.get("/api/v1/analytics/live-activity").status_code == 403
+
+    notes = learner.get("/api/v1/notifications?unread=true").json()["items"]
+    assert any(n["title"].startswith("Well spotted") and n["link"] == f"/inbox/{c['id']}" for n in notes)
+    synthetic_real = db.scalar(select(func.count()).select_from(SimulationEvent).where(
+        SimulationEvent.campaign_id == c["id"], SimulationEvent.is_synthetic.is_(False)))
+    assert synthetic_real == real_recipients + 1  # real deliveries + this report
+
+
+def test_report_submission_confirms_to_reporter(learner):
+    learner.post("/api/v1/reports", json={"subject": "Odd invoice email", "raw_text": "Please pay invoice now."})
+    notes = learner.get("/api/v1/notifications?unread=true").json()["items"]
+    assert any(n["title"] == "Report received" and n["link"] == "/reports" for n in notes)

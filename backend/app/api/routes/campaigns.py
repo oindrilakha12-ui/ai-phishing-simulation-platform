@@ -263,9 +263,13 @@ def inbox_preview(campaign_id: str, principal: Learner, db: DB, _u: UserOnly):
                                                       SimulationEvent.target_id == t.id)):
         raise NotFound("Campaign not found")
     preview = render_preview(c.template)
-    # Learners first see the lure WITHOUT the answer key; flags are revealed after they act.
-    preview["red_flags_hidden"] = True
-    preview["red_flags"] = []
+    my_actions = sorted(set(db.scalars(select(SimulationEvent.event_type).where(
+        SimulationEvent.campaign_id == c.id, SimulationEvent.target_id == t.id)).all()))
+    preview["my_actions"] = my_actions
+    # Learners first see the lure WITHOUT the answer key; flags are revealed once they have acted.
+    if not {"reported", "clicked_sim"} & set(my_actions):
+        preview["red_flags_hidden"] = True
+        preview["red_flags"] = []
     return preview
 
 
@@ -293,6 +297,10 @@ def inbox_action(campaign_id: str, body: InboxAction, request: Request, principa
         if enrollment:
             notify(db, principal.org_id, principal.id, "training", "Training assigned",
                    f"You were enrolled in '{enrollment.module.title}'.", "/training")
+    elif body.action == "reported" and not already:
+        notify(db, principal.org_id, principal.id, "simulation", "Well spotted! 🎉",
+               f"You correctly reported the simulation '{c.template.subject if c.template else c.name}'.",
+               f"/inbox/{c.id}")
     audit_p(db, principal, request, f"inbox.{body.action}", "campaign", c.id)
     db.commit()
     cache.invalidate_org(principal.org_id)

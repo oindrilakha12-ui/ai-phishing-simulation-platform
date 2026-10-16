@@ -117,6 +117,18 @@ export interface Preview {
   landing_page: string;
   watermark: string;
   red_flags_hidden?: boolean;
+  /** Inbox only: what the current learner has already done with this simulation. */
+  my_actions?: string[];
+}
+
+export interface LiveActivityItem {
+  at: string;
+  kind: "previewed" | "clicked_sim" | "reported" | "completed_training" | "report_submitted";
+  label: string;
+  actor: string;
+  detail: string;
+  department: string | null;
+  link: string;
 }
 
 export interface Indicator {

@@ -2,7 +2,10 @@
 
 When a campaign goes ACTIVE we do not send anything. Instead every targeted (synthetic)
 person gets an in-app preview, and we simulate plausible outcomes with a seeded RNG so
-analytics have realistic-looking data. All rows are flagged is_synthetic=True.
+analytics have realistic-looking data. Those rows are flagged is_synthetic=True.
+
+People linked to a real login (Target.user_id) only get the delivery, flagged is_synthetic=False;
+what they then do in the inbox is recorded as real activity.
 """
 from __future__ import annotations
 
@@ -43,15 +46,19 @@ def simulate_campaign(db: Session, campaign: Campaign, start: datetime, rng: ran
     flag_cats = [f.get("category", "link") for f in campaign.template.red_flags] or ["link"]
     n = 0
 
-    def ev(t: Target, kind: str, when: datetime, cat: str | None = None):
+    def ev(t: Target, kind: str, when: datetime, cat: str | None = None, synthetic: bool = True):
         nonlocal n
         db.add(SimulationEvent(org_id=campaign.org_id, campaign_id=campaign.id, target_id=t.id,
                                department_id=t.department_id, event_type=kind, occurred_at=when,
-                               red_flag_category=cat, is_synthetic=True))
+                               red_flag_category=cat, is_synthetic=synthetic))
         n += 1
 
     for t in targets:
         delivered = start + timedelta(minutes=rng.randint(0, 120))
+        if t.user_id:
+            # A real account decides for itself in the inbox: deliver only, never invent its outcome.
+            ev(t, "delivered_preview", delivered, synthetic=False)
+            continue
         ev(t, "delivered_preview", delivered)
         if rng.random() > 0.92:
             continue  # never opened

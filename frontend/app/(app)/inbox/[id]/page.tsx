@@ -22,7 +22,9 @@ export default function InboxItem() {
       const r = await api<ActionResult>(`/inbox/${id}/action`, { method: "POST", body: { action } });
       setResult(r);
       qc.invalidateQueries({ queryKey: ["inbox"] });
+      qc.invalidateQueries({ queryKey: ["inbox-preview", id] });
       qc.invalidateQueries({ queryKey: ["my-training"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     } catch (e) {
       toast.error(e);
     }
@@ -32,11 +34,27 @@ export default function InboxItem() {
   if (preview.error) return <ErrorState error={preview.error} />;
   const p = preview.data!;
   const shown: Preview = result?.landing_page ? { ...p, document: result.landing_page, links: [] } : p;
+  // Already handled on an earlier visit: say so instead of offering buttons that would change nothing.
+  const earlier = result ? null : p.my_actions?.includes("reported") ? "reported" : p.my_actions?.includes("clicked_sim") ? "clicked" : null;
 
   return (
     <>
       <PageHeader title="Review this message" subtitle="Would you trust it? Use the buttons below — nothing leaves the app." />
-      {!result && (
+      {earlier === "reported" && (
+        <Card className="mb-4">
+          <p role="status" className="font-medium text-green-800 dark:text-green-300">
+            ✓ You already reported this simulation — well spotted! The red flags are highlighted below.
+          </p>
+        </Card>
+      )}
+      {earlier === "clicked" && (
+        <Card className="mb-4">
+          <p role="status" className="font-medium text-amber-900 dark:text-amber-200">
+            You opened the link in this simulation earlier. Review the red flags below and check your <TLink href="/training">assigned training</TLink>.
+          </p>
+        </Card>
+      )}
+      {!result && !earlier && (
         <div className="mb-4 flex flex-wrap gap-2">
           <Button onClick={() => act("reported")}>🚩 Report phish</Button>
           <Button variant="secondary" onClick={() => act("clicked_sim")}>Open the link (simulated)</Button>
@@ -51,7 +69,7 @@ export default function InboxItem() {
         </Card>
       )}
       <Card>
-        <PreviewSandbox preview={shown} flags={result ? result.red_flags : []} />
+        <PreviewSandbox preview={shown} flags={result ? result.red_flags : earlier ? p.red_flags : []} />
       </Card>
     </>
   );

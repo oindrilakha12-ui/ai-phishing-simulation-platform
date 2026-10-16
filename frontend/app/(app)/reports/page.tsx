@@ -21,8 +21,9 @@ export default function ReportPhish() {
     setBusy(true);
     try {
       await api("/reports", { method: "POST", body: form });
-      toast.push("success", "Thanks for reporting! The security team will review it.");
+      toast.push("success", "Thanks for reporting! A manager will review it — watch the 🔔 bell for the result.");
       setForm({ subject: "", raw_text: "" });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
       setTimeout(() => qc.invalidateQueries({ queryKey: ["my-reports"] }), 500);
     } catch (err) {
       toast.error(err);

@@ -150,14 +150,14 @@ backend log if answers still look like demo output.
 | Auth | SSO / OIDC | DEMO-ONLY (mock IdP; real IdP documented, not implemented) |
 | Core | RBAC (4 roles) + tenant isolation (repository layer) | FULLY WORKING (RBAC matrix + cross-tenant tests) |
 | Core | Audit log on every mutation, pagination/filter/sort/search, soft delete, error envelope, health/readiness, OpenAPI | FULLY WORKING (tested) |
-| Campaigns | CRUD, lifecycle draft→scheduled→active→completed, department targeting, difficulty tiers, synthetic scheduler | FULLY WORKING (tested) |
+| Campaigns | CRUD, lifecycle draft→scheduled→active→completed, department targeting, difficulty tiers, synthetic scheduler; people linked to a real login only receive the lure, and their own inbox actions are recorded as real activity | FULLY WORKING (tested) |
 | Preview | Sandboxed iframe (no scripts) + CSP, watermark, red-flag hover highlight, inspect-link (displayed vs real) | FULLY WORKING (unit + E2E in Edge) |
-| Analytics | Click/report/completion rates, report-to-click, time-to-report, heatmap, trends, top flags, cohorts | FULLY WORKING (tested) |
+| Analytics | Click/report/completion rates, report-to-click, time-to-report, heatmap, trends, top flags, cohorts; "Real users only" filter and a live-activity feed (auto-refresh) | FULLY WORKING (tested) |
 | Exports | Analytics CSV/PDF, risk CSV, audit CSV, certificate PDF | FULLY WORKING (tested) |
 | Learning | Modules, lessons, quizzes with pass mark, auto-enrolment on simulated click, progress, certificates | FULLY WORKING (tested) |
 | Learning | Badges, streaks, leaderboard (department default, individual opt-in) | FULLY WORKING (tested) |
 | Risk | Explainable per-person and per-department scores, weekly history | FULLY WORKING (tested) |
-| Report-phish | Learner submit → background heuristic triage → manager queue → in-app feedback | FULLY WORKING (tested) |
+| Report-phish | Learner submit → "report received" notification → background heuristic triage → manager queue → in-app feedback | FULLY WORKING (tested) |
 | AI | LangGraph router, 4 agents, retry-once/error node, validator node, session memory, SSE | FULLY WORKING (tested in DEMO MODE; verified live with Gemini) |
 | AI | Indicator Analyst rule-based checks (SPF/DKIM/DMARC, Reply-To, link mismatch, lookalike/homoglyph, urgency…) | FULLY WORKING (tested; eval F1 0.948) |
 | AI | Live LLM explanations / tips / RAG answers / example generation | VERIFIED LIVE with Google Gemini (`gemini-3.5-flash-lite`) via the OpenAI-compatible API; OpenAI and Anthropic endpoints not run |
@@ -171,7 +171,7 @@ backend log if answers still look like demo output.
 
 ## Verified results (this machine)
 
-- **Backend:** `pytest` gives 133 passed, 88% line coverage. `ruff` is clean. `mypy` is clean in lenient mode.
+- **Backend:** `pytest` gives 135 passed, 88% line coverage. `ruff` is clean. `mypy` is clean in lenient mode.
 - **Frontend:** `eslint` and `tsc` are clean. `vitest` gives 15 passed. Playwright gives 4/4 passed in Microsoft Edge. `next build` succeeds.
 - **Audits:** `npm audit --omit=dev` finds 0 vulnerabilities. `pip-audit` finds 5 chromadb advisories, which are server-mode only, documented and ignored.
 - **Eval (live, Gemini `gemini-3.5-flash-lite`):** see [eval/README.md](eval/README.md).

@@ -12,13 +12,13 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import and_, distinct, func, select
 from sqlalchemy.orm import Session
 
 from app.core.cache import cache
-from app.db.models import Campaign, Department, Enrollment, SimulationEvent, Template
+from app.db.models import Campaign, Department, Enrollment, ReportedEmail, SimulationEvent, Target, Template, User
 
 
 def _rate(num: int, den: int) -> float:
@@ -36,15 +36,18 @@ def _percentile(values: list[float], pct: float) -> float | None:
 
 class Filters:
     def __init__(self, campaign_id: str | None = None, department_id: str | None = None,
-                 date_from: datetime | None = None, date_to: datetime | None = None):
+                 date_from: datetime | None = None, date_to: datetime | None = None, real_only: bool = False):
         self.campaign_id, self.department_id = campaign_id, department_id
         self.date_from, self.date_to = date_from, date_to
+        self.real_only = real_only  # only events from real logged-in users (is_synthetic=False)
 
     def key(self) -> str:
-        return f"{self.campaign_id}|{self.department_id}|{self.date_from}|{self.date_to}"
+        return f"{self.campaign_id}|{self.department_id}|{self.date_from}|{self.date_to}|{self.real_only}"
 
     def apply(self, stmt, org_id: str):
         conds = [SimulationEvent.org_id == org_id, SimulationEvent.deleted_at.is_(None)]
+        if self.real_only:
+            conds.append(SimulationEvent.is_synthetic.is_(False))
         if self.campaign_id:
             conds.append(SimulationEvent.campaign_id == self.campaign_id)
         if self.department_id:
@@ -119,6 +122,8 @@ def _overview(db: Session, org_id: str, f: Filters) -> dict[str, Any]:
 
     enroll_q = select(Enrollment.status, func.count()).where(Enrollment.org_id == org_id,
                                                              Enrollment.deleted_at.is_(None))
+    if f.real_only:
+        enroll_q = enroll_q.join(Target, Target.id == Enrollment.target_id).where(Target.user_id.is_not(None))
     enroll_counts = dict(db.execute(enroll_q.group_by(Enrollment.status)).all())
     total_enrolled = sum(enroll_counts.values())
     kpis["completion_rate"] = _rate(enroll_counts.get("completed", 0), total_enrolled)
@@ -173,4 +178,39 @@ def _overview(db: Session, org_id: str, f: Filters) -> dict[str, Any]:
     cohorts = [{"cohort": d, **_kpis(c)} for d, c in sorted(diff_counts.items(), key=lambda kv: order.get(kv[0], 9))]
 
     return {"kpis": kpis, "heatmap": heatmap, "departments": departments, "trend": trend,
-            "top_failed_flags": top_flags, "cohorts": cohorts, "synthetic_data": True}
+            "top_failed_flags": top_flags, "cohorts": cohorts, "synthetic_data": not f.real_only}
+
+
+LIVE_EVENT_LABELS = {
+    "previewed": "Opened a simulation",
+    "clicked_sim": "Clicked the simulated link",
+    "reported": "Reported the simulation as phishing",
+    "completed_training": "Completed assigned training",
+}
+
+
+def live_activity(db: Session, org_id: str, limit: int = 20) -> list[dict[str, Any]]:
+    """Most recent actions by REAL logged-in users (never synthetic), newest first. Not cached."""
+    ev_rows = db.execute(
+        select(SimulationEvent.occurred_at, SimulationEvent.event_type, Target.full_name, Campaign.name,
+               Department.name)
+        .join(Target, Target.id == SimulationEvent.target_id)
+        .join(Campaign, Campaign.id == SimulationEvent.campaign_id)
+        .join(Department, Department.id == SimulationEvent.department_id)
+        .where(SimulationEvent.org_id == org_id, SimulationEvent.deleted_at.is_(None),
+               SimulationEvent.is_synthetic.is_(False), SimulationEvent.event_type.in_(LIVE_EVENT_LABELS))
+        .order_by(SimulationEvent.occurred_at.desc()).limit(limit)).all()
+    items: list[dict[str, Any]] = [
+             {"at": at, "kind": kind, "label": LIVE_EVENT_LABELS[kind], "actor": person, "detail": camp,
+              "department": dept, "link": "/campaigns"} for at, kind, person, camp, dept in ev_rows]
+
+    rep_rows = db.execute(
+        select(ReportedEmail.created_at, ReportedEmail.subject, ReportedEmail.status, User.full_name)
+        .join(User, User.id == ReportedEmail.reporter_user_id)
+        .where(ReportedEmail.org_id == org_id, ReportedEmail.deleted_at.is_(None))
+        .order_by(ReportedEmail.created_at.desc()).limit(limit)).all()
+    items += [{"at": at, "kind": "report_submitted", "label": "Submitted a suspicious-email report",
+               "actor": name, "detail": f"{subject} ({status.replace('_', ' ')})", "department": None,
+               "link": "/reports/triage"} for at, subject, status, name in rep_rows]
+    items.sort(key=lambda i: cast(datetime, i["at"]), reverse=True)
+    return items[:limit]

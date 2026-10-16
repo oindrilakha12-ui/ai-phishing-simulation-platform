@@ -73,6 +73,9 @@ def submit_report(body: ReportIn, request: Request, principal: Learner, db: DB, 
                                                 User.role.in_(("manager", "org_admin")))).all()
     for mid in managers:
         notify(db, principal.org_id, mid, "report", "New phish report", body.subject[:120], "/reports/triage")
+    notify(db, principal.org_id, principal.id, "report_feedback", "Report received",
+           f"Thanks! '{body.subject[:80]}' is being checked. You'll be notified when a manager reviews it.",
+           "/reports")
     ids = webhooks.enqueue(db, principal.org_id, "report.submitted", {"report_id": r.id, "subject": r.subject})
     db.commit()
     background.add_task(triage_in_background, r.id)

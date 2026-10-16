@@ -11,7 +11,7 @@ from sqlalchemy import select
 from app.api.deps import DB, Manager, Paging, Principal, repo_for, require_role
 from app.core.cache import cache
 from app.db.models import Organization, RiskScore, Target
-from app.services.analytics import Filters, overview
+from app.services.analytics import Filters, live_activity, overview
 from app.services.audit import audit_p
 from app.services.exports import analytics_csv, analytics_pdf, rows_to_csv
 from app.services.risk import compute_target_scores, department_scores, snapshot
@@ -22,8 +22,9 @@ AnalyticsReader = Annotated[Principal, Depends(require_role("manager", api_scope
 
 def _filters(campaign_id: Annotated[str | None, Query(max_length=32)] = None,
              department_id: Annotated[str | None, Query(max_length=32)] = None,
-             date_from: datetime | None = None, date_to: datetime | None = None) -> Filters:
-    return Filters(campaign_id, department_id, date_from, date_to)
+             date_from: datetime | None = None, date_to: datetime | None = None,
+             real_only: bool = False) -> Filters:
+    return Filters(campaign_id, department_id, date_from, date_to, real_only)
 
 
 F = Annotated[Filters, Depends(_filters)]
@@ -32,6 +33,13 @@ F = Annotated[Filters, Depends(_filters)]
 @router.get("/analytics/overview")
 def analytics_overview(principal: AnalyticsReader, db: DB, f: F):
     return overview(db, principal.org_id, f)
+
+
+@router.get("/analytics/live-activity")
+def analytics_live_activity(principal: AnalyticsReader, db: DB,
+                            limit: Annotated[int, Query(ge=1, le=50)] = 20):
+    """Latest actions by real logged-in users (inbox clicks/reports, report submissions)."""
+    return {"items": live_activity(db, principal.org_id, limit)}
 
 
 @router.get("/analytics/export.csv")

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
-import { atLeast } from "@/lib/format";
+import { atLeast, dt } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import type { Page } from "@/lib/types";
 import { ErrorBoundary } from "./error-boundary";
@@ -26,7 +26,15 @@ const NAV: NavItem[] = [
   { href: "/admin", label: t.nav.admin, min: "org_admin" },
 ];
 
-type Notif = { id: string; title: string; body: string; link: string | null; read_at: string | null; created_at: string };
+type Notif = { id: string; kind: string; title: string; body: string; link: string | null; read_at: string | null; created_at: string };
+
+// What each notification is about, so the bell reads as a timeline rather than a list of titles.
+const NOTIF_KIND: Record<string, { label: string; tone: "blue" | "green" | "amber" | "purple" | "slate" }> = {
+  simulation: { label: "Simulation", tone: "blue" },
+  training: { label: "Training", tone: "amber" },
+  report: { label: "New report", tone: "purple" },
+  report_feedback: { label: "Your report", tone: "green" },
+};
 
 function Notifications() {
   const [open, setOpen] = useState(false);
@@ -34,8 +42,15 @@ function Notifications() {
   const q = useQuery({
     queryKey: ["notifications"],
     queryFn: () => api<Page<Notif> & { unread: number }>("/notifications", { query: { page_size: 8 } }),
-    refetchInterval: 30_000,
+    refetchInterval: 15_000,
   });
+  const markOne = async (n: Notif) => {
+    setOpen(false);
+    if (!n.read_at) {
+      await api(`/notifications/${n.id}/read`, { method: "POST" }).catch(() => undefined);
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    }
+  };
   const markAll = async () => {
     await api("/notifications/read-all", { method: "POST" });
     qc.invalidateQueries({ queryKey: ["notifications"] });
@@ -63,17 +78,20 @@ function Notifications() {
           <ul className="max-h-80 overflow-y-auto">
             {(q.data?.items ?? []).map((n) => (
               <li key={n.id} className={cx("rounded px-2 py-2 text-sm", !n.read_at && "bg-blue-50 dark:bg-blue-950")}>
-                {n.link ? (
-                  <Link href={n.link} onClick={() => setOpen(false)} className="font-medium hover:underline">
-                    {n.title}
-                  </Link>
-                ) : (
-                  <span className="font-medium">{n.title}</span>
-                )}
+                <div className="mb-0.5 flex items-center justify-between gap-2">
+                  <Badge tone={NOTIF_KIND[n.kind]?.tone ?? "slate"}>{NOTIF_KIND[n.kind]?.label ?? "Update"}</Badge>
+                  <span className="text-[11px] text-slate-500">{dt(n.created_at)}</span>
+                </div>
+                <span className="font-medium">{n.title}</span>
                 <p className="text-xs text-slate-600 dark:text-slate-400">{n.body}</p>
+                {n.link && (
+                  <Link href={n.link} onClick={() => markOne(n)} className="text-xs font-medium text-blue-700 hover:underline dark:text-blue-400">
+                    Open →
+                  </Link>
+                )}
               </li>
             ))}
-            {q.data && q.data.items.length === 0 && <li className="px-2 py-4 text-sm text-slate-500">No notifications</li>}
+            {q.data && q.data.items.length === 0 && <li className="px-2 py-4 text-sm text-slate-500">No notifications yet. You will be told here about new simulations, assigned training and the result of your reports.</li>}
           </ul>
         </div>
       )}

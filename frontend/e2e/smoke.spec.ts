@@ -18,7 +18,8 @@ test("manager: login → dashboard → campaigns → preview sandbox", async ({ 
 
   await page.getByRole("link", { name: "Campaigns" }).click();
   await expect(page.getByRole("heading", { name: "Campaigns" })).toBeVisible();
-  await page.getByRole("table").getByRole("link").first().click();
+  // A completed campaign always has events; a freshly seeded draft (listed first) has none.
+  await page.getByRole("table").getByRole("row").filter({ hasText: "completed" }).getByRole("link").first().click();
   await expect(page.getByText("Synthetic event log")).toBeVisible();
 
   await page.getByRole("link", { name: "Templates" }).click();
