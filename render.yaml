@@ -1,0 +1,50 @@
+# Render Blueprint: PhishGuard (backend API + frontend), both built from the repo's Dockerfiles.
+# Deploy: Render dashboard -> New -> Blueprint -> pick this repo/branch -> Apply.
+# Free tier notes: SQLite lives on the container's ephemeral disk and is re-seeded on every boot,
+# and free services sleep after ~15 min idle (first request wakes them, ~30-60 s).
+services:
+  - type: web
+    name: phishguard-api
+    runtime: docker
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    plan: free
+    healthCheckPath: /health/ready
+    envVars:
+      - key: PORT
+        value: "8001"
+      - key: ENVIRONMENT
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: DATABASE_URL
+        value: sqlite:////data/phishguard.db
+      - key: CHROMA_PATH
+        value: /data/chroma
+      - key: FRONTEND_ORIGIN
+        value: https://phishguard-web.onrender.com
+      # Demo AI by default. For live Gemini, set these three in the Render dashboard (never commit keys).
+      - key: AI_PROVIDER
+        value: demo
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai
+      - key: OPENAI_MODEL
+        value: gemini-3.5-flash-lite
+
+  - type: web
+    name: phishguard-web
+    runtime: docker
+    dockerContext: ./frontend
+    dockerfilePath: ./frontend/Dockerfile
+    plan: free
+    healthCheckPath: /login
+    envVars:
+      - key: PORT
+        value: "3000"
+      # Baked in at build time (Next.js rewrites). Must equal the API service's public URL.
+      - key: BACKEND_URL
+        value: https://phishguard-api.onrender.com
