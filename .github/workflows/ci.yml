@@ -45,6 +45,8 @@ jobs:
     name: End-to-end smoke (Playwright)
     needs: [backend, frontend]
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:////tmp/phishguard-ci.db
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -85,7 +87,8 @@ jobs:
           }
           trap cleanup EXIT
 
-          npx wait-on -t 60000 http://127.0.0.1:3000/login http://127.0.0.1:8001/health/ready
+          npx wait-on -t 60000 http-get://127.0.0.1:3000/login http-get://127.0.0.1:8001/health/live
+          curl --fail-with-body --silent --show-error http://127.0.0.1:8001/health/ready
           npx playwright test
 
   security:
