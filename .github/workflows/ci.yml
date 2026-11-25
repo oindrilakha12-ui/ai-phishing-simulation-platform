@@ -60,6 +60,9 @@ jobs:
           (cd ../backend && alembic upgrade head && python -m app.seed)
           npm ci
           npm run build
+          # Standalone output doesn't include static assets; mirror the Dockerfile copies.
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public
           npx playwright install --with-deps chromium
 
       - name: Start services and run Playwright
